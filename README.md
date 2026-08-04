@@ -1,33 +1,30 @@
 # RAG with LangChain + IBM Granite
 
-A minimal, end-to-end example of **Retrieval Augmented Generation (RAG)** built with LangChain and IBM's Granite models. It shows how to ground an LLM's answers in real documents instead of relying purely on what the model memorized during training.
+An end-to-end Retrieval Augmented Generation (RAG) pipeline built with LangChain and IBM's Granite models — extended with a RAG-vs-no-RAG comparison, a retrieval confidence check, and a reusable query interface.
 
-## What is RAG?
+## Why this exists
 
-Retrieval Augmented Generation improves the accuracy and relevance of language model output by retrieving factual information from a knowledge base and feeding it into the model alongside the user's question — instead of asking the model to answer from memory alone.
+Most RAG tutorials stop at "retrieve, stuff into prompt, generate" and call it done. That leaves two open questions I wanted answered before trusting a pipeline like this:
 
-Typical use cases:
+1. **Is retrieval actually changing the answer?** If the model already knows the answer, RAG isn't adding anything — and without checking, you can't tell "grounded" apart from "lucky."
+2. **How do I know retrieval found the right context?** A RAG pipeline can silently retrieve weakly-related chunks and still produce a confident-sounding (wrong) answer.
 
-- **Customer support** — answer product questions using the actual product docs.
-- **Domain Q&A** — explore a specialized field (finance, law, medicine) using source papers or articles.
-- **Current events** — chat about recent news by retrieving relevant articles at query time.
+This project builds on the base [IBM Granite Community](https://github.com/ibm-granite-community) RAG recipe and adds three things to answer those questions directly.
 
-The pipeline has three stages:
+## What's in here
 
-1. **Index** — split source documents into chunks, embed them, and store the vectors in a vector database.
-2. **Retrieve** — embed the incoming query and pull the most semantically similar chunks from the database.
-3. **Generate** — pass the retrieved chunks and the original question to an LLM to produce a grounded answer.
+| Addition | What it does | Why it matters |
+|---|---|---|
+| **RAG vs. no-RAG comparison** | Asks the same question with and without retrieved context | Shows the actual delta retrieval provides, instead of assuming it helps |
+| **Retrieval confidence check** | Prints similarity scores for each retrieved chunk | Lets you catch weak/irrelevant retrieval before trusting the answer |
+| **`ask()` helper function** | Wraps the pipeline for reuse across questions or documents | Turns a one-shot notebook demo into something you can actually query interactively |
 
-## Stack
+## How the pipeline works
 
-| Component | Choice used in this notebook |
-|---|---|
-| Embeddings | `ibm-granite/granite-embedding-small-english-r2` (Hugging Face) |
-| Vector store | [Chroma](https://www.trychroma.com/) (in-memory) |
-| LLM | `ibm-granite/granite-4.1-8b` via [Replicate](https://replicate.com/ibm-granite) |
-| Orchestration | [LangChain](https://python.langchain.com/) |
-
-Each component is swappable — see the linked recipes in the notebook for alternative embedding models, vector stores, and LLM providers.
+1. **Index** — split source documents into chunks, embed them with `ibm-granite/granite-embedding-small-english-r2`, and store the vectors in a [Chroma](https://www.trychroma.com/) vector database.
+2. **Retrieve** — embed the incoming query and pull the most semantically similar chunks.
+3. **Generate** — pass the retrieved chunks and the question to `ibm-granite/granite-4.1-8b` (via [Replicate](https://replicate.com/ibm-granite)) to produce a grounded answer.
+4. **Verify** — check retrieval scores and compare against the ungrounded baseline before trusting the output.
 
 ## Getting started
 
@@ -38,47 +35,40 @@ git clone https://github.com/<your-username>/<your-repo>.git
 cd <your-repo>
 ```
 
-### 2. Set up your environment
+### 2. Get a Replicate API token
 
-This notebook is designed to run in Google Colab or a local Jupyter environment with Python 3.10+.
-
-### 3. Get a Replicate API token
-
-The LLM in this example is served via [Replicate](https://replicate.com/). Create an account, generate an API token, and set it as an environment variable (or Colab secret) named:
+The LLM is served via [Replicate](https://replicate.com/). Create an account, generate an API token, and set it as an environment variable (or Colab secret) named:
 
 ```
 REPLICATE_API_TOKEN
 ```
 
-### 4. Run the notebook
+### 3. Run the notebook
 
-Open `RAG_with_Langchain.ipynb` and run the cells top to bottom. The notebook will:
-
-- Install dependencies
-- Load an embedding model and vector database
-- Download a sample document (the 2022 State of the Union address)
-- Chunk and embed the document into the vector store
-- Retrieve relevant passages for a sample query
-- Generate a grounded answer using the Granite LLM
+Open `RAG_with_Langchain.ipynb` in Colab or Jupyter and run top to bottom. It will install dependencies, build the vector index over a sample document (the 2022 State of the Union address), and walk through retrieval, generation, and the verification steps above.
 
 ## Example
 
 ```python
-query = "What did the president say about Ketanji Brown Jackson?"
-output = rag_chain.invoke({"input": query})
-print(output["answer"])
+print(ask("What did the president say about inflation?", show_sources=True))
 ```
 
-The model answers using only the passages retrieved from the source document, rather than relying on unverified prior knowledge.
+Output includes both the generated answer and the source chunks it was grounded in, so you can audit the answer instead of taking it on faith.
 
-## Swapping in your own data
+## Using your own data
 
-Replace the document download step with your own source files (PDF, text, HTML, etc.) and adjust the `TextLoader` accordingly. Any LangChain-supported document loader will work here — the rest of the pipeline (chunking, embedding, retrieval, generation) stays the same.
+Swap the document-download cell for your own source (PDF, text, HTML, etc.) — any LangChain document loader works. The rest of the pipeline, including the verification steps, works unchanged.
+
+## Possible next steps
+
+- Swap Chroma for a persistent/managed vector store for production use.
+- Add automated retrieval-quality regression tests against a labeled question set.
+- Extend `ask()` with conversation memory for multi-turn Q&A.
 
 ## Acknowledgments
 
-Built on the [IBM Granite Community](https://github.com/ibm-granite-community) recipes and the [LangChain](https://python.langchain.com/) framework.
+Built on the [IBM Granite Community](https://github.com/ibm-granite-community) RAG recipe and the [LangChain](https://python.langchain.com/) framework. Extended with the comparison, scoring, and reusability additions described above.
 
 ## License
 
-Add a license of your choice (MIT is a common default for sample projects like this).
+MIT (or a license of your choice).
